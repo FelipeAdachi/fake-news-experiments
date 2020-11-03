@@ -1,0 +1,19 @@
+program:
+  src.models.grid_search
+parameters:
+  model:
+    values: ["nb","svc","rf","sgd"]
+  denoise:
+    values: ["False", "True"]
+
+command:
+  - python
+  - "-m"
+  - ${program}
+  - ${args}
+
+method: grid
+metric:
+  name: accuracy_score
+  goal: maximize
+project: fn_experiments
