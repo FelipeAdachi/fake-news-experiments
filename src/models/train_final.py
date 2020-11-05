@@ -66,15 +66,15 @@ x_test = pd.read_csv(io.BytesIO(x_test_csv),encoding='utf-8')['text']
 y_test = pd.read_csv(io.BytesIO(y_test_csv),encoding='utf-8')['category']
 
 data = {}
-# data['x_train'] = x_train
-# data['y_train'] = y_train
-# data['x_test'] = x_test
-# data['y_test'] = y_test
+data['x_train'] = x_train
+data['y_train'] = y_train
+data['x_test'] = x_test
+data['y_test'] = y_test
 
-data['x_train'] = x_train.sample(n=200)
-data['y_train'] = y_train.sample(n=200)
-data['x_test'] = x_test.sample(n=200)
-data['y_test'] = y_test.sample(n=200)
+# data['x_train'] = x_train.sample(n=200)
+# data['y_train'] = y_train.sample(n=200)
+# data['x_test'] = x_test.sample(n=200)
+# data['y_test'] = y_test.sample(n=200)
 
 run_name = wandb.run.name
 filename = '{}.joblib'.format(run_name)
