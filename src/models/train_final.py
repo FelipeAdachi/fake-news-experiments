@@ -14,9 +14,10 @@ from ..features import denoise
 import requests
 import io
 from definitions import ROOT_DIR
+import pickle
 
 
-def train_final_model(data, model_type):
+def train_final_model(data, model_type, run_name):
     x_train = data['x_train']
     y_train = data['y_train']
     x_test = data['x_test']
@@ -27,6 +28,7 @@ def train_final_model(data, model_type):
     count_vect = CountVectorizer()
     tfidf_transformer = TfidfTransformer()
     X_train_counts = count_vect.fit_transform(x_train)
+    pickle.dump(count_vect.vocabulary_,open(os.path.join(model_path,"feature_"+run_name+".pickle"),"wb"))
     X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
     if model_type == 'svm':
         clf = svm.SVC(kernel='linear', probability=True).fit(
@@ -46,6 +48,8 @@ def train_final_model(data, model_type):
 
 
 model_type = 'svm'
+model_path = os.path.join(ROOT_DIR,'models')
+
 tags = [model_type]
 
 run = wandb.init(project='fn_experiments', job_type='final_model_trainer')
@@ -78,7 +82,8 @@ data['y_test'] = y_test
 
 run_name = wandb.run.name
 filename = '{}.joblib'.format(run_name)
-clf = train_final_model(data, model_type)
+feature_name = 'feature_{}.pickle'.format(run_name)
+clf = train_final_model(data, model_type,run_name)
 
 ### Saving model to local
 model_path = os.path.join(ROOT_DIR,'models')
@@ -87,7 +92,7 @@ joblib.dump(clf, os.path.join(model_path, filename))
 ### Uploading model to S3 Bucket
 s3 = boto3.client('s3')
 metadata = {}
-
+feature_metadata = {}
 bucket = "fn-e2e"
 with open(os.path.join(model_path, filename), "rb") as f:
     key = "models/{}".format(filename)
@@ -100,12 +105,27 @@ with open(os.path.join(model_path, filename), "rb") as f:
     model_url = f'https://{bucket}.s3.amazonaws.com/{key}?versionId={version_id}'
     metadata['model_url'] = model_url
 
+with open(os.path.join(model_path, feature_name), "rb") as f:
+    key = "models/{}".format(feature_name)
+
+    response = s3.upload_fileobj(
+        f, bucket, key, ExtraArgs={'ACL': 'public-read'})
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    version_id = obj['VersionId']
+    metadata['feature_version_id'] = version_id
+    feature_url = f'https://{bucket}.s3.amazonaws.com/{key}?versionId={version_id}'
+    metadata['feature_url'] = feature_url
+
 ### Logging model artifact in W&B with reference to S3 Bucket
 artifact = wandb.Artifact(
     'model', type='model', metadata=metadata)
 
 artifact.add_reference(
     model_url, name=filename, checksum=True)
+
+artifact.add_reference(
+    feature_url, name=feature_name, checksum=True)
+
 run.log_artifact(artifact, aliases=tags)
 # end the current run
 wandb.join()
